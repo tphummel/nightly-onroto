@@ -23,11 +23,14 @@ jobs:
       run: |
         set -x
 
+        wget http://stedolan.github.io/jq/download/linux64/jq
+        chmod +x ./jq
+
         npm install -g onroto-standings-scraper
         curl https://baseball5.onroto.com/baseball/webnew/display_stand.pl\?"$LEAGUE_ID"\&session_id\="$ONROTO_SESSION_TOKEN" > standings.html
         onroto-standings-scraper ./standings.html > standings.json
 
-        standings_date=$(cat standings.json | jq -r ".standingsDate")
+        standings_date=$(cat standings.json | ./jq -r ".standingsDate")
         mv standings.json "$standings_date.json"
 
         # https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-environment-variable
