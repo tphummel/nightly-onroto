@@ -32,10 +32,9 @@ jobs:
 
         # https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-environment-variable
         echo "standings_date=$standings_date" >> $GITHUB_ENV
-      with:
-        env:
-          ONROTO_SESSION_TOKEN: ${{ secrets.ONROTO_SESSION_TOKEN }}
-          ONROTO_LEAGUE_ID: ${{ secrets.ONROTO_LEAGUE_ID}}
+      env:
+        ONROTO_SESSION_TOKEN: ${{ secrets.ONROTO_SESSION_TOKEN }}
+        ONROTO_LEAGUE_ID: ${{ secrets.ONROTO_LEAGUE_ID}}
 
     - uses: ncipollo/release-action@v1
       with:
