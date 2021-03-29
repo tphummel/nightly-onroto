@@ -1,0 +1,46 @@
+name: Capture Fantasy Baseball Standings Each Night
+
+on:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    # 3:01pm UTC every day
+    - cron:  '1 15 * * *'
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    # not checking out code. not needed
+    # - name: obligatory checkout step
+    #   uses: actions/checkout@v1
+    - name: Use Node.js 14.x
+      uses: actions/setup-node@v1
+      with:
+        node-version: 14.x
+
+    - name: download and parse standings data
+      run: |
+        set -x
+
+        npm install -g onroto-standings-scraper
+        curl https://baseball5.onroto.com/baseball/webnew/display_stand.pl\?"$LEAGUE_ID"\&session_id\="$ONROTO_SESSION_TOKEN" > standings.html
+        onroto-standings-scraper ./standings.html > standings.json
+
+        standings_date=$(cat standings.json | jq -r ".standingsDate")
+        mv standings.json "$standings_date.json"
+
+        # https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-environment-variable
+        echo "standings_date=$standings_date" >> $GITHUB_ENV
+      with:
+        env:
+          ONROTO_SESSION_TOKEN: ${{ secrets.ONROTO_SESSION_TOKEN }}
+          ONROTO_LEAGUE_ID: ${{ secrets.ONROTO_LEAGUE_ID}}
+
+    - uses: ncipollo/release-action@v1
+      with:
+        allowUpdates: false
+        artifact: "${{ env.standings_date}}.json"
+        omitBody: true
+        name: ${{ env.standings_date }}
+        token: ${{ secrets.GITHUB_TOKEN }}
