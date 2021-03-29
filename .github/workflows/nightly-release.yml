@@ -27,7 +27,7 @@ jobs:
         chmod +x ./jq
 
         npm install -g onroto-standings-scraper
-        curl https://baseball5.onroto.com/baseball/webnew/display_stand.pl\?"$LEAGUE_ID"\&session_id\="$ONROTO_SESSION_TOKEN" > standings.html
+        curl https://baseball5.onroto.com/baseball/webnew/display_stand.pl\?"$ONROTO_LEAGUE_ID"\&session_id\="$ONROTO_SESSION_TOKEN" > standings.html
         onroto-standings-scraper ./standings.html > standings.json
 
         standings_date=$(./jq -r ".standingsDate" standings.json)
