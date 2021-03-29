@@ -1,10 +1,10 @@
 name: Capture Fantasy Baseball Standings Each Night
 
-on:
-  schedule:
-    # * is a special character in YAML so you have to quote this string
-    # 3:01pm UTC every day
-    - cron:  '1 15 * * *'
+on: workflow_dispatch
+  # schedule:
+  #   # * is a special character in YAML so you have to quote this string
+  #   # 3:01pm UTC every day
+  #   - cron:  '1 15 * * *'
 
 jobs:
 
