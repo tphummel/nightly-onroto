@@ -29,22 +29,16 @@ jobs:
         ./jq --version
 
         npm install -g onroto-standings-scraper
-        curl https://baseball5.onroto.com/baseball/webnew/display_stand.pl\?"$ONROTO_LEAGUE_ID"\&session_id\="$ONROTO_SESSION_TOKEN" > standings.html
+        echo $HOME
+        pwd
+        curl https://baseball5.onroto.com/baseball/webnew/display_stand.pl\?"$ONROTO_LEAGUE_ID"\&session_id\="$ONROTO_SESSION_TOKEN" > $HOME/standings.html
 
-        ls -lah standings.*
+        # /home/runner/work/nightly-onroto/nightly-onroto
 
-        cat ./standings.html
+        onroto-standings-scraper $HOME/standings.html > $HOME/standings.json
 
-        onroto-standings-scraper ./standings.html
-
-        onroto-standings-scraper ./standings.html > standings.json
-
-        ls -lah standings.*
-
-        ./jq -r ".standingsDate" standings.json
-
-        standings_date=$(./jq -r ".standingsDate" standings.json)
-        mv standings.json "$standings_date.json"
+        standings_date=$(./jq -r ".standingsDate" $HOME/standings.json)
+        mv $HOME/standings.json "$HOME/$standings_date.json"
 
         # https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-environment-variable
         echo "standings_date=$standings_date" >> $GITHUB_ENV
