@@ -33,6 +33,10 @@ jobs:
 
         ls -lah standings.*
 
+        cat ./standings.html
+
+        onroto-standings-scraper ./standings.html
+
         onroto-standings-scraper ./standings.html > standings.json
 
         ls -lah standings.*
