@@ -46,11 +46,11 @@ jobs:
         ONROTO_SESSION_TOKEN: ${{ secrets.ONROTO_SESSION_TOKEN }}
         ONROTO_LEAGUE_ID: ${{ secrets.ONROTO_LEAGUE_ID}}
 
-    - uses: ncipollo/release-action@v1
+    - uses: "marvinpinto/action-automatic-releases@latest"
       with:
-        allowUpdates: false
-        artifacts: "${{ env.standings_date}}.json"
-        omitBody: true
-        commit: ${{ env.GITHUB_SHA }}
-        name: ${{ env.standings_date }}
-        token: ${{ secrets.GITHUB_TOKEN }}
+        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+        automatic_release_tag: "latest"
+        prerelease: false
+        title: "${{ env.standings_date }}"
+        files: |
+          "${{ env.standings_date}}.json"
