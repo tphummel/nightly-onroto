@@ -1,10 +1,15 @@
 name: Capture Fantasy Baseball Standings Each Night
 
-on: workflow_dispatch
-  # schedule:
-  #   # * is a special character in YAML so you have to quote this string
-  #   # 3:01pm UTC every day
-  #   - cron:  '1 15 * * *'
+# for diagnostic
+# on: workflow_dispatch
+
+# scheduled
+on:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    # 4:01pm UTC every day.
+    # 9:01am pacific (UTC-7)
+    - cron:  '1 16 * * *'
 
 jobs:
 
@@ -48,7 +53,7 @@ jobs:
     - uses: "marvinpinto/action-automatic-releases@latest"
       with:
         repo_token: "${{ secrets.GITHUB_TOKEN }}"
-        automatic_release_tag: "today"
+        automatic_release_tag: "${{ env.standings_date }}"
         prerelease: false
         title: "${{ env.standings_date }}"
         files: |
