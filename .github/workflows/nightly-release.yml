@@ -40,12 +40,23 @@ jobs:
         standings_date=$(./jq -r ".standingsDate" $HOME/standings.json)
         mv $HOME/standings.json "$HOME/$standings_date.json"
 
+        echo "$HOME/$standings_date.json"
+
         # https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-environment-variable
         echo "standings_date=$standings_date" >> $GITHUB_ENV
         echo "standings_file=$HOME/$standings_date.json" >> $GITHUB_ENV
       env:
         ONROTO_SESSION_TOKEN: ${{ secrets.ONROTO_SESSION_TOKEN }}
         ONROTO_LEAGUE_ID: ${{ secrets.ONROTO_LEAGUE_ID}}
+
+    - name: diagnostics
+      run: |
+        echo $standings_file
+        ls -lah $standings_file
+        pwd
+        ls -lah $(pwd)
+        echo "$HOME"
+        ls -lah $HOME
 
     - uses: "marvinpinto/action-automatic-releases@latest"
       with:
@@ -54,4 +65,4 @@ jobs:
         prerelease: false
         title: "${{ env.standings_date }}"
         files: |
-          "${{ env.standings_file}}.json"
+          "${{ env.standings_file }}"
