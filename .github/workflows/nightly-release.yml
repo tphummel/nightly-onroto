@@ -29,54 +29,26 @@ jobs:
         ./jq --version
 
         npm install -g onroto-standings-scraper
-        echo $HOME
-        pwd
-        curl https://baseball5.onroto.com/baseball/webnew/display_stand.pl\?"$ONROTO_LEAGUE_ID"\&session_id\="$ONROTO_SESSION_TOKEN" > $HOME/standings.html
+        curl https://baseball5.onroto.com/baseball/webnew/display_stand.pl\?"$ONROTO_LEAGUE_ID"\&session_id\="$ONROTO_SESSION_TOKEN" > standings.html
 
         # /home/runner/work/nightly-onroto/nightly-onroto
 
-        onroto-standings-scraper $HOME/standings.html > $HOME/standings.json
+        onroto-standings-scraper $(pwd)/standings.html > $(pwd)/standings.json
 
-        standings_date=$(./jq -r ".standingsDate" $HOME/standings.json)
-        mv $HOME/standings.json "$HOME/$standings_date.json"
-
-        echo "$HOME/$standings_date.json"
+        standings_date=$(./jq -r ".standingsDate" standings.json)
+        mv standings.json "$standings_date.json""
 
         # https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-environment-variable
         echo "standings_date=$standings_date" >> $GITHUB_ENV
-        echo "standings_file=$HOME/$standings_date.json" >> $GITHUB_ENV
       env:
         ONROTO_SESSION_TOKEN: ${{ secrets.ONROTO_SESSION_TOKEN }}
         ONROTO_LEAGUE_ID: ${{ secrets.ONROTO_LEAGUE_ID}}
-
-    - name: diagnostics
-      run: |
-        echo $standings_file
-        ls -lah $standings_file
-        pwd
-        ls -lah $(pwd)
-        echo "$HOME"
-        ls -lah $HOME
 
     - uses: "marvinpinto/action-automatic-releases@latest"
       with:
         repo_token: "${{ secrets.GITHUB_TOKEN }}"
         automatic_release_tag: "latest"
         prerelease: false
-        title: "${{ env.standings_date }}a"
+        title: "${{ env.standings_date }}"
         files: |
-          /home/runner/${{ env.standings_date}}.json
-          /home/runner/2021-04-01.json
-          "${{ env.standings_file }}"
-
-    - name: Release
-      uses: softprops/action-gh-release@v1
-      with:
-        name: "${{ env.standings_date }}b"
-        files: |
-          standings.json
           ${{ env.standings_date}}.json
-          ${{ env.standings_file }}
-
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
