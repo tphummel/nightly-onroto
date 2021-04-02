@@ -63,6 +63,20 @@ jobs:
         repo_token: "${{ secrets.GITHUB_TOKEN }}"
         automatic_release_tag: "latest"
         prerelease: false
-        title: "${{ env.standings_date }}"
+        title: "${{ env.standings_date }}a"
         files: |
+          /home/runner/${{ env.standings_date}}.json
+          /home/runner/2021-04-01.json
           "${{ env.standings_file }}"
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: "${{ env.standings_date }}b"
+        files: |
+          standings.json
+          ${{ env.standings_date}}.json
+          ${{ env.standings_file }}
+
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
