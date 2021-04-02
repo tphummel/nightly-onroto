@@ -36,7 +36,8 @@ jobs:
         onroto-standings-scraper $(pwd)/standings.html > $(pwd)/standings.json
 
         standings_date=$(./jq -r ".standingsDate" standings.json)
-        mv standings.json "$standings_date.json"
+        cp standings.html "$standings_date.html"
+        cp standings.json "$standings_date.json"
 
         # https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-environment-variable
         echo "standings_date=$standings_date" >> $GITHUB_ENV
@@ -52,3 +53,6 @@ jobs:
         title: "${{ env.standings_date }}"
         files: |
           ${{ env.standings_date}}.json
+          standings.json
+          ${{ env.standings_date}}.html
+          standings.html
