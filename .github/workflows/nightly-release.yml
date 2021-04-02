@@ -42,6 +42,7 @@ jobs:
 
         # https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-environment-variable
         echo "standings_date=$standings_date" >> $GITHUB_ENV
+        echo "standings_file=$HOME/$standings_date.json" >> $GITHUB_ENV
       env:
         ONROTO_SESSION_TOKEN: ${{ secrets.ONROTO_SESSION_TOKEN }}
         ONROTO_LEAGUE_ID: ${{ secrets.ONROTO_LEAGUE_ID}}
@@ -53,4 +54,4 @@ jobs:
         prerelease: false
         title: "${{ env.standings_date }}"
         files: |
-          "${{ env.HOME }}/${{ env.standings_date}}.json"
+          "${{ env.standings_file}}.json"
