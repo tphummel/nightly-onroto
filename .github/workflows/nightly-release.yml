@@ -1,4 +1,4 @@
-name: Capture Fantasy Baseball Standings Each Night
+name: Capture Standings Each Morning
 
 # for diagnostic
 # on: workflow_dispatch
