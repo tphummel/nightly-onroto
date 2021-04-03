@@ -1,6 +1,6 @@
 # nightly onroto standings scrape
 
-[![Capture Fantasy Baseball Standings Each Night](https://github.com/tphummel/nightly-onroto/actions/workflows/nightly-release.yml/badge.svg)](https://github.com/tphummel/nightly-onroto/actions/workflows/nightly-release.yml)
+[![Capture Fantasy Baseball Standings Each Night](https://github.com/tphummel/nightly-onroto/actions/workflows/nightly-release.yml/badge.svg)](https://github.com/tphummel/nightly-onroto/actions/workflows/nightly-release.yml) [![Latest Release](https://img.shields.io/github/v/release/tphummel/nightly-onroto)](https://github.com/tphummel/nightly-onroto/releases)
 
 ## what/why?
 
