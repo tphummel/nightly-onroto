@@ -28,7 +28,7 @@ jobs:
       run: |
         set -x
 
-        wget https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64
+        wget https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64 -O jq
         chmod +x ./jq
 
         ./jq --version
