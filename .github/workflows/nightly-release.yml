@@ -1,8 +1,5 @@
 name: Capture Standings Each Morning
 
-# for diagnostic
-# on: workflow_dispatch
-
 # scheduled
 on:
   schedule:
@@ -10,6 +7,8 @@ on:
     # 2:01pm UTC every day.
     # 7:01am pacific (UTC-7)
     - cron:  '1 14 * * *'
+  # for diagnostic / adhoc
+  workflow_dispatch:
 
 jobs:
 
