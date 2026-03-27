@@ -15,48 +15,39 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    # not checking out code. not needed
-    # - name: obligatory checkout step
-    #   uses: actions/checkout@v1
-    - name: Use Node.js 14.x
-      uses: actions/setup-node@v1
+    - name: Use Node.js 22.x
+      uses: actions/setup-node@v4
       with:
-        node-version: 14.x
+        node-version: 22.x
 
     - name: download and parse standings data
       run: |
         set -x
 
-        wget https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64 -O jq
-        chmod +x ./jq
-
-        ./jq --version
+        jq --version
 
         npm install -g onroto-standings-scraper
-        curl https://baseball5.onroto.com/baseball/webnew/display_stand.pl\?"$ONROTO_LEAGUE_ID"\&session_id\="$ONROTO_SESSION_TOKEN" > standings.html
-
-        # /home/runner/work/nightly-onroto/nightly-onroto
+        curl https://onroto.fangraphs.com/baseball/webnew/display_stand.pl\?"$ONROTO_LEAGUE_ID"\&session_id\="$ONROTO_SESSION_TOKEN" > standings.html
 
         onroto-standings-scraper $(pwd)/standings.html > $(pwd)/standings.json
 
-        standings_date=$(./jq -r ".standingsDate" standings.json)
+        standings_date=$(jq -r ".standingsDate" standings.json)
         cp standings.html "$standings_date.html"
         cp standings.json "$standings_date.json"
 
-        # https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-environment-variable
         echo "standings_date=$standings_date" >> $GITHUB_ENV
       env:
         ONROTO_SESSION_TOKEN: ${{ secrets.ONROTO_SESSION_TOKEN }}
         ONROTO_LEAGUE_ID: ${{ secrets.ONROTO_LEAGUE_ID}}
 
-    - uses: "marvinpinto/action-automatic-releases@latest"
-      with:
-        repo_token: "${{ secrets.GITHUB_TOKEN }}"
-        automatic_release_tag: "${{ env.standings_date }}"
-        prerelease: false
-        title: "${{ env.standings_date }}"
-        files: |
-          ${{ env.standings_date}}.json
-          standings.json
-          ${{ env.standings_date}}.html
+    - name: Create GitHub Release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create "${{ env.standings_date }}" \
+          --repo "${{ github.repository }}" \
+          --title "${{ env.standings_date }}" \
+          "${{ env.standings_date }}.json" \
+          standings.json \
+          "${{ env.standings_date }}.html" \
           standings.html
