@@ -1,0 +1,5 @@
+
+# season report: cached downloads and generated pages
+report/.cache/
+report/out/
+__pycache__/
