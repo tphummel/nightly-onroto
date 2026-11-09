@@ -188,6 +188,88 @@ def num_runs(nums):
     return [str(a) if a == b else f"{a}–{b}" for a, b in runs]
 
 
+CAT_NAMES = {
+    "HOME RUNS": "Home Runs",
+    "NET STEALS": "Net Steals",
+    "RBI + RUNS - HR": "RBI + Runs − HR",
+    "SO - BB": "Strikeouts − Walks",
+    "SV + HO - BS": "Saves + Holds − Blown Saves",
+    "WINS + QUALITY STARTS": "Wins + Quality Starts",
+}
+
+
+QUIET = 0.4  # a day is "quiet" if league-wide activity is under this share of a typical day's
+
+
+def daily_changes(snaps):
+    """Single-day team results in the counting categories.
+
+    The snapshots hold year-to-date totals, so one day's result is the change
+    in a team's total between two snapshots one calendar day apart. Rate stats
+    (OBP, ERA) are left out: a single day's rate can't be recovered without PA/IP.
+
+    Days that can't be trusted as a single day are skipped:
+      * the first snapshot of the season (no previous day to difference against)
+      * a day whose previous-day snapshot is missing
+      * a day right after a league-wide quiet day. Activity (the sum of every team's
+        change in every counting category) under 40% of the season's median active
+        day means a no-games day or a snapshot taken before OnRoto finished updating;
+        in the latter case the next day's change carries both days.
+    Returns None when the snapshots carry no category detail.
+    """
+    dates = sorted(snaps)
+    cs0 = snaps[dates[0]].get("categoryStandings") or []
+    if not cs0:
+        return None
+    labels = [k for k in cs0[0] if k != "team"]
+    rate = {l for sn in snaps.values() for x in sn.get("categoryStandings", []) for l in labels
+            if "." in str(x[l]["Year"])}
+    counting = [l for l in labels if l not in rate]
+
+    def year(d):
+        return {x["team"]: {l: float(str(x[l]["Year"]).replace(",", "")) for l in counting}
+                for x in snaps[d].get("categoryStandings", [])}
+
+    deltas, activity, unevaluated = {}, {}, 0
+    prev_d, prev_y = None, None
+    for d in dates:
+        y = year(d)
+        if prev_d is not None and (_day(d) - _day(prev_d)).days == 1:
+            deltas[d] = {t: {l: y[t][l] - prev_y[t][l] for l in counting} for t in y if t in prev_y}
+            activity[d] = sum(abs(v) for ls in deltas[d].values() for v in ls.values())
+        else:
+            unevaluated += 1
+        prev_d, prev_y = d, y
+    active = sorted(v for v in activity.values() if v > 0)
+    typical = active[len(active) // 2] if active else 0
+    quiet = {d for d, v in activity.items() if v < QUIET * typical}
+
+    entries, after_quiet = [], []
+    for d in sorted(deltas):
+        prev = (_day(d) - dt.timedelta(days=1)).isoformat()
+        if prev in quiet:
+            if d not in quiet:
+                after_quiet.append(_day(d))
+            continue
+        for t, ls in deltas[d].items():
+            for l, v in ls.items():
+                entries.append({"label": l, "team": t, "date": _day(d), "value": v})
+    return {"labels": counting, "entries": entries, "after_quiet": after_quiet,
+            "unevaluated": unevaluated, "all_labels": labels}
+
+
+def top_days(daily, label, n):
+    """Best n team-days in a category, plus how many more tie the last one shown."""
+    rows = sorted((e_ for e_ in daily["entries"] if e_["label"] == label),
+                  key=lambda r: (-r["value"], r["date"], r["team"]))
+    shown = rows[:n]
+    for r in shown:
+        r["rank"] = 1 + sum(1 for x in rows if x["value"] > r["value"])
+        r["tied"] = sum(1 for x in rows if x["value"] == r["value"]) > 1
+    more = sum(1 for x in rows[n:] if shown and x["value"] == shown[-1]["value"])
+    return shown, more
+
+
 def missing_days(snaps):
     dates = sorted(_day(s) for s in snaps)
     have = set(dates)
@@ -227,7 +309,7 @@ CSS = """:root{color-scheme:light dark;--bg:#fafaf7;--card:#fff;--text:#1c2230;-
 *{box-sizing:border-box}
 body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.45}
 main{max-width:880px;margin:0 auto;padding:1.25rem 16px 3rem}
-h1{font-size:1.7rem;margin:.2rem 0 .25rem} h2{font-size:1.25rem;margin:2.2rem 0 .6rem;padding-top:.4rem;border-top:1px solid var(--border)}
+h1{font-size:1.7rem;margin:.2rem 0 .25rem} h3{font-size:1rem;margin:1.4rem 0 .4rem} h2{font-size:1.25rem;margin:2.2rem 0 .6rem;padding-top:.4rem;border-top:1px solid var(--border)}
 .meta,.muted{color:var(--muted)} .small{font-size:.85rem}
 .podium{display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:.6rem;align-items:end;margin:1.2rem 0}
 .pod{text-align:center;display:flex;flex-direction:column;align-items:center}
@@ -335,7 +417,28 @@ def render_tally(ov, wins, tie_weeks):
             f'<p class="muted small">{note}.</p>')
 
 
-def render_page(season, repo, ov, cats, weeks, snaps, in_progress=False, excluded=()):
+def render_best_days(daily, cats, n):
+    if not daily or not daily["entries"]:
+        return ""
+    codes = dict(zip(daily["all_labels"], cats)) if len(daily["all_labels"]) == len(cats) else {}
+    out = ('<h2 id="best-days">Best single days</h2>\n'
+           f'<p class="muted">The {n} best single days by a team in each counting category. A team can appear more than '
+           'once, and ties are listed earliest first. OBP and ERA are left out because a one-day rate can\'t be worked out without plate appearances and innings.</p>\n')
+    for label in daily["labels"]:
+        shown, more = top_days(daily, label, n)
+        code = f' <span class="muted">({e(codes[label])})</span>' if label in codes else ""
+        rows = "".join(
+            f'<tr><td class="n">{"T-" if r["tied"] else ""}{r["rank"]}</td><td class="t">{e(r["team"])}</td>'
+            f'<td>{md(r["date"], "%a %b %-d")}</td><td class="n tot">{fmt(r["value"])}</td></tr>' for r in shown)
+        extra = (f'<p class="muted small">{more} more team-day{"" if more == 1 else "s"} also at {fmt(shown[-1]["value"])}.</p>'
+                 if more else "")
+        out += (f'<h3>{e(CAT_NAMES.get(label, label))}{code}</h3>\n'
+                '<div class="scroll"><table class="narrow"><thead><tr><th class="n">#</th><th>Team</th><th>Day</th>'
+                f'<th class="n">Total</th></tr></thead><tbody>{rows}</tbody></table></div>{extra}\n')
+    return out
+
+
+def render_page(season, repo, ov, cats, weeks, snaps, in_progress=False, excluded=(), daily=None, top_n=5):
     nteams, ncats = len(ov), len(cats)
     last = _day(sorted(snaps)[-1])
     weeks_tbl, wins, tie_weeks = render_weeks(weeks)
@@ -377,6 +480,18 @@ def render_page(season, repo, ov, cats, weeks, snaps, in_progress=False, exclude
             [f"{date_range(w['start'], w['end'])} ({days_label(w['days'])}"
              + ("" if w["missing"] else f", won by {names(winners(w['standings']))}") + ")"
              for w in excluded]) + ".")
+    if daily and daily["entries"]:
+        skipped = ["the first snapshot of the season"]
+        if daily["unevaluated"] > 1:
+            skipped.append("any day whose previous day has no snapshot")
+        aq = daily["after_quiet"]
+        skipped.append(f"the day after a league-wide quiet day ({len(aq)} day{'' if len(aq) == 1 else 's'} this season)")
+        notes.append("<b>Best single days:</b> a day's total is the change in a team's year-to-date total between two "
+                     "consecutive daily snapshots, so it is only as exact as OnRoto's nightly figures (later stat "
+                     "corrections can show up as part of a day). Skipped as not clearly one day: "
+                     + human_list(skipped) + ". A quiet day is one where all teams together moved under "
+                     f"{int(QUIET * 100)}% as much as on a typical day. It is either a no-games day or a snapshot taken "
+                     "before OnRoto finished updating, and in the second case the next day would carry both days.")
     notes.append("Results reflect each week's last snapshot, so any later OnRoto stat corrections "
                  "are not included.")
 
@@ -406,6 +521,7 @@ def render_page(season, repo, ov, cats, weeks, snaps, in_progress=False, exclude
 <h2 id="tally">Weeks won</h2>
 {render_tally(ov, wins, tie_weeks)}
 
+{render_best_days(daily, cats, top_n)}
 <h2 id="method">Method &amp; caveats</h2>
 <ul>
 {"".join(f"<li>{n}</li>" + chr(10) for n in notes)}</ul>
@@ -413,7 +529,7 @@ def render_page(season, repo, ov, cats, weeks, snaps, in_progress=False, exclude
 
 
 # --------------------------------------------------------------------------
-def generate(season, data_dir, repo=DEFAULT_REPO, in_progress=False, min_days=1):
+def generate(season, data_dir, repo=DEFAULT_REPO, in_progress=False, min_days=1, top_n=5):
     snaps = load_snapshots(data_dir, season)
     if not snaps:
         raise SystemExit(f"no {season} snapshots found in {data_dir}")
@@ -426,7 +542,8 @@ def generate(season, data_dir, repo=DEFAULT_REPO, in_progress=False, min_days=1)
         raise SystemExit(f"no weeks of at least {min_days} days")
     for i, w in enumerate(weeks):  # renumber and re-flag after any exclusions
         w["n"], w["is_first"], w["is_last"] = i + 1, i == 0, i == len(weeks) - 1
-    return render_page(season, repo, ov, cats, weeks, snaps, in_progress, excluded)
+    return render_page(season, repo, ov, cats, weeks, snaps, in_progress, excluded,
+                       daily_changes(snaps), top_n)
 
 
 def main(argv=None):
@@ -438,6 +555,8 @@ def main(argv=None):
     ap.add_argument("--repo", default=DEFAULT_REPO, help=f"GitHub repo holding the releases (default {DEFAULT_REPO})")
     ap.add_argument("--min-days", type=int, default=1,
                     help="leave out shortened opening/closing weeks with fewer days than this (default 1: count every week)")
+    ap.add_argument("--top-days", type=int, default=5, metavar="N",
+                    help="how many single-day results to list per counting category (default 5)")
     ap.add_argument("--in-progress", action="store_true",
                     help="label the standings as current rather than final (for a season still under way)")
     a = ap.parse_args(argv)
@@ -447,7 +566,7 @@ def main(argv=None):
     out = a.out or os.path.join(here, "out", f"{a.season}.html")
     if not a.no_download:
         download_season(a.repo, a.season, data_dir)
-    page = generate(a.season, data_dir, a.repo, a.in_progress, a.min_days)
+    page = generate(a.season, data_dir, a.repo, a.in_progress, a.min_days, a.top_days)
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with open(out, "w") as f:
         f.write(page)

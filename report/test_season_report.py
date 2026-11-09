@@ -91,6 +91,76 @@ class WeeksTest(unittest.TestCase):
         self.assertIn(dt.date(2026, 4, 6), sr.missing_days(snaps))
 
 
+def cat_snapshot(date, hr, obp=None):
+    """A snapshot carrying year-to-date category detail: HR (counting) and OBP (rate)."""
+    snap = snapshot(date, A_WINS)
+    obp = obp or {t: ".300" for t in hr}
+    snap["categoryStandings"] = [
+        {"team": t, "HOME RUNS": {"Year": str(hr[t]), "Wk": "0", "PTS": "1.0", "+/-": "0.0"},
+         "ON BASE PCT": {"Year": obp[t], "Wk": ".300", "PTS": "1.0", "+/-": "0.0"}}
+        for t in hr
+    ]
+    return snap
+
+
+def hr(a, b):
+    return {"Aces": a, "Bats": b}
+
+
+class DailyTest(unittest.TestCase):
+    def series(self, days):
+        return sr.load_snapshots(write_season({d: cat_snapshot(d, h) for d, h in days.items()}), "2026")
+
+    def test_single_day_is_change_between_consecutive_snapshots(self):
+        daily = sr.daily_changes(self.series({
+            "2026-04-01": hr(0, 0), "2026-04-02": hr(2, 1), "2026-04-03": hr(5, 2),
+        }))
+        got = {(r["team"], str(r["date"])): r["value"] for r in daily["entries"]}
+        self.assertEqual(got[("Aces", "2026-04-02")], 2)
+        self.assertEqual(got[("Aces", "2026-04-03")], 3)
+        self.assertNotIn(("Aces", "2026-04-01"), got)  # first snapshot: nothing to difference against
+
+    def test_rate_stats_are_left_out(self):
+        daily = sr.daily_changes(self.series({"2026-04-01": hr(0, 0), "2026-04-02": hr(1, 1)}))
+        self.assertEqual(daily["labels"], ["HOME RUNS"])
+
+    def test_day_after_missing_snapshot_is_skipped(self):
+        daily = sr.daily_changes(self.series({
+            "2026-04-01": hr(0, 0), "2026-04-02": hr(2, 1), "2026-04-04": hr(9, 9),  # 04-03 missing
+        }))
+        self.assertNotIn("2026-04-04", {str(r["date"]) for r in daily["entries"]})
+
+    def test_day_after_a_quiet_day_is_skipped(self):
+        daily = sr.daily_changes(self.series({
+            "2026-04-01": hr(0, 0), "2026-04-02": hr(2, 1), "2026-04-03": hr(4, 2),
+            "2026-04-04": hr(4, 2),    # nobody moved: quiet
+            "2026-04-05": hr(12, 5),   # big catch-up day: must not become a "best single day"
+            "2026-04-06": hr(14, 6),
+        }))
+        dates = {str(r["date"]) for r in daily["entries"]}
+        self.assertNotIn("2026-04-05", dates)
+        self.assertIn("2026-04-06", dates)
+        self.assertEqual([str(d) for d in daily["after_quiet"]], ["2026-04-05"])
+        shown, more = sr.top_days(daily, "HOME RUNS", 1)
+        self.assertEqual((shown[0]["value"], more), (2, 2))  # Aces 04-02 / 04-03... never the 8-HR day
+
+    def test_top_days_ranks_ties_and_counts_the_rest(self):
+        daily = sr.daily_changes(self.series({
+            "2026-04-01": hr(0, 0), "2026-04-02": hr(3, 3), "2026-04-03": hr(4, 5),
+        }))
+        shown, more = sr.top_days(daily, "HOME RUNS", 1)
+        self.assertEqual((shown[0]["rank"], shown[0]["tied"], more), (1, True, 1))
+
+    def test_page_has_a_section_only_when_category_detail_exists(self):
+        with_cats = write_season({
+            "2026-03-29": cat_snapshot("2026-03-29", hr(0, 0)),
+            "2026-03-30": cat_snapshot("2026-03-30", hr(3, 1)),
+        })
+        self.assertIn("Best single days", sr.generate("2026", with_cats))
+        without = write_season({"2026-03-29": snapshot("2026-03-29", A_WINS)})
+        self.assertNotIn("Best single days", sr.generate("2026", without))
+
+
 class GapTest(unittest.TestCase):
     def setUp(self):
         # weeks of Mar 30 and Apr 6 have no snapshots at all; Apr 13 week has one
