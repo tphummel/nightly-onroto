@@ -35,5 +35,6 @@ Notes:
 
 - Weekly results are OnRoto's own weekly roto points from the last snapshot in each Monday-Sunday week, so nothing is estimated. A week whose Sunday snapshot is missing uses the latest earlier snapshot and is tagged on the page.
 - A season that starts or ends mid-week gets a shortened first or last week, tagged on the page, that counts as its own week.
+- A whole week with no snapshots (the scrape didn't run) is shown as a "no snapshots" row, keeps its calendar week number, and is left out of the tally; it is described in the page's notes.
 - Teams, categories and league size are read from the data, so the report adapts to each season.
 - Tests: `python3 -m unittest discover -s report`

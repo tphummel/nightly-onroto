@@ -135,12 +135,20 @@ def build_weeks(snaps):
         monday = _day(s) - dt.timedelta(days=_day(s).weekday())
         groups.setdefault(monday, []).append(s)
     weeks = []
-    for i, monday in enumerate(sorted(groups)):
-        snap_dates = groups[monday]
-        end_snap = snap_dates[-1]
+    n_weeks = (max(groups) - min(groups)).days // 7 + 1
+    for i in range(n_weeks):
+        monday = min(groups) + dt.timedelta(days=7 * i)
         start = max(monday, first)
         sunday = monday + dt.timedelta(days=6)
         end = min(sunday, last)
+        if monday not in groups:  # a whole week with no snapshots: show the gap, don't hide it
+            weeks.append({
+                "n": i + 1, "start": start, "end": end, "days": (end - start).days + 1,
+                "partial": False, "is_first": False, "is_last": False,
+                "snapshot": None, "stale": False, "missing": True, "standings": [],
+            })
+            continue
+        end_snap = groups[monday][-1]
         rows = sorted(
             [{"team": w.get("Team") or w.get("Team Name"), "total": float(w["TOTAL"])}
              for w in snaps[end_snap]["weekStandings"]],
@@ -150,12 +158,34 @@ def build_weeks(snaps):
             "n": i + 1,
             "start": start, "end": end, "days": (end - start).days + 1,
             "partial": (end - start).days + 1 < 7,
-            "is_first": i == 0, "is_last": i == len(groups) - 1,
+            "is_first": i == 0, "is_last": i == n_weeks - 1,
             "snapshot": _day(end_snap),
             "stale": _day(end_snap) < end,  # Sunday snapshot missing
+            "missing": False,
             "standings": rows,
         })
     return weeks
+
+
+def day_ranges(days):
+    """Group sorted dates into (first, last) runs of consecutive days."""
+    runs = []
+    for d in days:
+        if runs and (d - runs[-1][1]).days == 1:
+            runs[-1][1] = d
+        else:
+            runs.append([d, d])
+    return [(a, b) for a, b in runs]
+
+
+def num_runs(nums):
+    runs = []
+    for n in nums:
+        if runs and n == runs[-1][1] + 1:
+            runs[-1][1] = n
+        else:
+            runs.append([n, n])
+    return [str(a) if a == b else f"{a}–{b}" for a, b in runs]
 
 
 def missing_days(snaps):
@@ -203,7 +233,8 @@ h1{font-size:1.7rem;margin:.2rem 0 .25rem} h2{font-size:1.25rem;margin:2.2rem 0 
 .pod{text-align:center;display:flex;flex-direction:column;align-items:center}
 .medal{font-size:1.8rem} .pname{font-weight:700;margin:.15rem 0;overflow-wrap:anywhere} .ppts{color:var(--muted);font-variant-numeric:tabular-nums;margin-bottom:.35rem}
 .bar{width:100%;border-radius:.5rem .5rem 0 0;display:flex;align-items:flex-start;justify-content:center;font-size:1.6rem;font-weight:800;padding-top:.3rem;color:#fff}
-.p1 .bar{height:130px;background:var(--gold)} .p2 .bar{height:96px;background:var(--silver)} .p3 .bar{height:70px;background:var(--bronze)}
+.p1 .bar{height:130px} .p2 .bar{height:96px} .p3 .bar{height:70px}
+.r1 .bar{background:var(--gold)} .r2 .bar{background:var(--silver)} .r3 .bar{background:var(--bronze)}
 .p1 .pname{font-size:1.15rem}
 .scroll{overflow-x:auto;background:var(--card);border:1px solid var(--border);border-radius:.6rem}
 table{border-collapse:collapse;width:100%;font-size:.92rem} th,td{padding:.45rem .6rem;text-align:left;white-space:nowrap}
@@ -221,17 +252,32 @@ def rank_of(rows, r):
 
 
 def render_podium(ov):
-    slots = [(1, "p2", "🥈"), (0, "p1", "🥇"), (2, "p3", "🥉")]
+    """Podium of the top three places; medals and colors follow rank, so tied teams share one."""
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    slots = [(1, "p2"), (0, "p1"), (2, "p3")]
     out = ""
-    for i, cls, medal in slots:
+    for i, cls in slots:
         if i >= len(ov):
             continue
         r = ov[i]
+        rk = min(rank_of(ov, r), 3)
+        cls += f" r{rk}"
+        medal = medals[rk]
         tied = sum(1 for x in ov if abs(x["total"] - r["total"]) < EPS) > 1
         out += (f'<div class="pod {cls}"><div class="medal">{medal}</div>'
                 f'<div class="pname">{e(r["team"])}</div><div class="ppts">{fmt(r["total"])}</div>'
                 f'<div class="bar"><span>{"T-" if tied else ""}{rank_of(ov, r)}</span></div></div>')
     return out
+
+
+def podium_note(ov):
+    if len(ov) <= 3:
+        return ""
+    off = [x["team"] for x in ov[3:] if abs(x["total"] - ov[2]["total"]) < EPS]
+    if not off:
+        return ""
+    return (f'<p class="muted small">Also tied for {rank_of(ov, ov[2])}{"rd" if rank_of(ov, ov[2]) == 3 else "th"}: '
+            + human_list([e(t) for t in off]) + ".</p>")
 
 
 def render_overall(ov, cats):
@@ -249,6 +295,10 @@ def render_overall(ov, cats):
 def render_weeks(weeks):
     rows, wins, tie_weeks = "", {}, []
     for w in weeks:
+        if w["missing"]:
+            rows += (f'<tr><td class="n">{w["n"]}</td><td>{date_range(w["start"], w["end"])}</td>'
+                     '<td class="muted" colspan="3">No snapshots for this week</td></tr>')
+            continue
         ws = winners(w["standings"])
         for x in ws:
             wins[x["team"]] = wins.get(x["team"], 0) + 1
@@ -292,7 +342,10 @@ def render_page(season, repo, ov, cats, weeks, snaps, in_progress=False, exclude
 
     notes = []
     first_w, last_w = weeks[0], weeks[-1]
+    nodata = [w for w in weeks if w["missing"]]
     span = f"{len(weeks)} weeks, {md(first_w['start'])} – {md(last_w['end'])}"
+    if nodata:
+        span += f"; {len(nodata)} with no data, not scored"
     intro_extra = ""
     if first_w["partial"]:
         intro_extra = (f" Week 1 is the shortened opening week ({date_range(first_w['start'], first_w['end'], '%a %b %-d')}) "
@@ -302,20 +355,28 @@ def render_page(season, repo, ov, cats, weeks, snaps, in_progress=False, exclude
                         f"and counts as its own week.")
     if last_w["partial"] and in_progress:
         intro_extra += f" The latest week is in progress (through {md(last_w['end'], '%a %b %-d')})."
-    miss = missing_days(snaps)
+    nodata_days = {d for w in nodata for d in (w["start"] + dt.timedelta(n) for n in range(w["days"]))}
+    miss = [d for d in missing_days(snaps) if d not in nodata_days]
     stale = [w for w in weeks if w["stale"] and not w["is_last"]]
     notes.append("<b>Weekly:</b> taken directly from OnRoto's own weekly standings in the last "
                  "snapshot of each week (normally Sunday's).")
     if miss and not stale:
-        notes[-1] += (" Missing snapshots on " + human_list([md(d, "%a %b %-d") for d in miss])
+        notes[-1] += (" Missing snapshots on " + human_list([date_range(a, b, "%a %b %-d") for a, b in day_ranges(miss)])
                       + " don't affect any week.")
     elif stale:
-        notes[-1] += (" Weeks " + ", ".join(str(w["n"]) for w in stale)
-                      + " use the latest earlier snapshot because Sunday's was missing (tagged above).")
+        one = len(stale) == 1
+        notes[-1] += (f" Week{'' if one else 's'} " + human_list([str(w["n"]) for w in stale])
+                      + f" {'uses' if one else 'use'} the latest earlier snapshot because Sunday's was missing (tagged above).")
+    if nodata:
+        notes.append("Week" + ("" if len(nodata) == 1 else "s") + " " + human_list(num_runs([w["n"] for w in nodata])) + " ("
+                     + date_range(nodata[0]["start"], nodata[-1]["end"])
+                     + (") has no nightly snapshots, so it cannot" if len(nodata) == 1 else ") have no nightly snapshots, so they cannot")
+                     + " be scored or counted in the tally.")
     if excluded:
         notes.append("Excluded as too short to score as a week: " + human_list(
-            [f"{date_range(w['start'], w['end'])} ({days_label(w['days'])}, won by "
-             f"{names(winners(w['standings']))})" for w in excluded]) + ".")
+            [f"{date_range(w['start'], w['end'])} ({days_label(w['days'])}"
+             + ("" if w["missing"] else f", won by {names(winners(w['standings']))}") + ")"
+             for w in excluded]) + ".")
     notes.append("Results reflect each week's last snapshot, so any later OnRoto stat corrections "
                  "are not included.")
 
@@ -334,6 +395,7 @@ def render_page(season, repo, ov, cats, weeks, snaps, in_progress=False, exclude
 
 <h2 id="final">{final_h}</h2>
 <div class="podium" aria-label="Top 3 podium">{render_podium(ov)}</div>
+{podium_note(ov)}
 {render_overall(ov, cats)}
 <p class="muted small">Category columns are roto points ({nteams} = best, 1 = worst, ties split) from the {"latest" if in_progress else "final"} nightly snapshot.</p>
 

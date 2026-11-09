@@ -91,6 +91,28 @@ class WeeksTest(unittest.TestCase):
         self.assertIn(dt.date(2026, 4, 6), sr.missing_days(snaps))
 
 
+class GapTest(unittest.TestCase):
+    def setUp(self):
+        # weeks of Mar 30 and Apr 6 have no snapshots at all; Apr 13 week has one
+        self.d = write_season({
+            "2026-03-29": snapshot("2026-03-29", A_WINS),
+            "2026-04-19": snapshot("2026-04-19", B_WINS),
+        })
+
+    def test_empty_weeks_are_shown_not_skipped(self):
+        weeks = sr.build_weeks(sr.load_snapshots(self.d, "2026"))
+        self.assertEqual([w["n"] for w in weeks], [1, 2, 3, 4])
+        self.assertEqual([w["missing"] for w in weeks], [False, True, True, False])
+
+    def test_page_reports_gap_and_excludes_it_from_tally(self):
+        page = sr.generate("2026", self.d)
+        self.assertIn("No snapshots for this week", page)
+        self.assertIn("Weeks 2–3", page)
+        self.assertIn("2 with no data, not scored", page)
+        # Aces won week 1 (A_WINS), Bats won week 4 (B_WINS): one week each, nothing else counted
+        self.assertEqual(page.count('<td class="n">1</td></tr>'), 2)
+
+
 class ReportTest(unittest.TestCase):
     def test_overall_and_page(self):
         d = write_season({
