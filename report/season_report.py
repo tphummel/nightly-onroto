@@ -315,9 +315,8 @@ h1{font-size:1.7rem;margin:.2rem 0 .25rem} h3{font-size:1rem;margin:1.4rem 0 .4r
 .pod{text-align:center;display:flex;flex-direction:column;align-items:center}
 .medal{font-size:1.8rem} .pname{font-weight:700;margin:.15rem 0;overflow-wrap:anywhere} .ppts{color:var(--muted);font-variant-numeric:tabular-nums;margin-bottom:.35rem}
 .bar{width:100%;border-radius:.5rem .5rem 0 0;display:flex;align-items:flex-start;justify-content:center;font-size:1.6rem;font-weight:800;padding-top:.3rem;color:#fff}
-.p1 .bar{height:130px} .p2 .bar{height:96px} .p3 .bar{height:70px}
-.r1 .bar{background:var(--gold)} .r2 .bar{background:var(--silver)} .r3 .bar{background:var(--bronze)}
-.p1 .pname{font-size:1.15rem}
+.r1 .bar{height:130px;background:var(--gold)} .r2 .bar{height:96px;background:var(--silver)} .r3 .bar{height:70px;background:var(--bronze)}
+.r1 .pname{font-size:1.15rem}
 .scroll{overflow-x:auto;background:var(--card);border:1px solid var(--border);border-radius:.6rem}
 table{border-collapse:collapse;width:100%;font-size:.92rem} th,td{padding:.45rem .6rem;text-align:left;white-space:nowrap}
 thead th{font-size:.78rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);border-bottom:1px solid var(--border)}
@@ -326,7 +325,7 @@ tbody tr+tr td{border-top:1px solid var(--border)}
 .narrow{max-width:420px}
 .tag{font-size:.7rem;font-weight:600;background:var(--tagbg);color:var(--muted);border-radius:.8rem;padding:.05rem .45rem;margin-left:.25rem;white-space:nowrap} .tag.warn{color:var(--warn)}
 ul{padding-left:1.2rem} li{margin:.3rem 0}
-@media(max-width:560px){.hide-s{display:none} td.t,td.win{white-space:normal} th,td{padding:.4rem .4rem;font-size:.85rem} .p1 .bar{height:100px} .p2 .bar{height:76px} .p3 .bar{height:56px} h1{font-size:1.4rem}}"""
+@media(max-width:560px){.hide-s{display:none} td.t,td.win{white-space:normal} th,td{padding:.4rem .4rem;font-size:.85rem} .r1 .bar{height:100px} .r2 .bar{height:76px} .r3 .bar{height:56px} h1{font-size:1.4rem}}"""
 
 
 def rank_of(rows, r):

@@ -183,6 +183,25 @@ class GapTest(unittest.TestCase):
         self.assertEqual(page.count('<td class="n">1</td></tr>'), 2)
 
 
+class PodiumTest(unittest.TestCase):
+    def pods(self, totals):
+        ov = [{"team": n, "total": v, "cats": {}} for n, v in totals]
+        html = sr.render_podium(ov)
+        import re
+        return re.findall(r'class="pod (p\d r\d)"', html)
+
+    def test_tie_for_second_gives_both_silvers_the_same_rank_class(self):
+        # slot order on the page is 2nd, 1st, 3rd; CSS height and color follow the r<rank> class
+        self.assertEqual(self.pods([("A", 10), ("B", 5), ("C", 5)]), ["p2 r2", "p1 r1", "p3 r2"])
+
+    def test_tie_for_first_gives_both_golds(self):
+        self.assertEqual(self.pods([("A", 10), ("B", 10), ("C", 5)]), ["p2 r1", "p1 r1", "p3 r3"])
+
+    def test_height_css_follows_rank_not_slot(self):
+        self.assertIn(".r2 .bar{height:96px", sr.CSS)
+        self.assertNotIn(".p2 .bar{height", sr.CSS)
+
+
 class ReportTest(unittest.TestCase):
     def test_overall_and_page(self):
         d = write_season({
